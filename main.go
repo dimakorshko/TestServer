@@ -42,8 +42,11 @@ func main() {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080" // Порт по умолчанию, если переменная окружения PORT не установлена
+		log.Fatal("$PORT must be set") // port = "8080"
 	}
+
+	log.Printf("Server started on port %s", port)
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/register", registerHandler)
