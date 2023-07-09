@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"os"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/lib/pq"
 )
 
 type User struct {
@@ -21,15 +21,20 @@ type User struct {
 var db *sql.DB
 
 func main() {
-	// Установка соединения с базой данных SQLite3
-	var err error
-	db, err = sql.Open("sqlite3", "database.db")
+	// Establish connection to the PostgreSQL database
+	connStr := os.Getenv("DATABASE_URL")
+	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
 
-	// Создание таблицы пользователей, если она не существует
+	err = db.Ping()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Create the users table if it doesn't exist
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS users (
 		username TEXT PRIMARY KEY,
 		password TEXT,
@@ -42,12 +47,8 @@ func main() {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		log.Fatal("$PORT must be set") // port = "8080"
-		port = "49330"
+		port = "8080" // Default port if PORT environment variable is not set
 	}
-
-	log.Printf("Server started on port %s", port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
 
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/register", registerHandler)
@@ -58,19 +59,19 @@ func main() {
 }
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
-	// Проверка авторизации пользователя
+	// Check if the user is authenticated
 	cookie, err := r.Cookie("session_token")
 	if err != nil || !isSessionValid(cookie.Value) {
-		// Перенаправление на страницу авторизации
+		// Redirect to the login page
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
 
-	// Получение данных пользователя из базы данных
+	// Get the user data from the database
 	username := getUsernameFromSession(cookie.Value)
 	user := getUser(username)
 
-	// Загрузка шаблона HTML
+	// Load the HTML template
 	tmpl, err := template.ParseFiles("templates/home.html")
 	if err != nil {
 		log.Println(err)
@@ -78,7 +79,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Отображение данных пользователя на странице
+	// Render the user data on the page
 	err = tmpl.Execute(w, user)
 	if err != nil {
 		log.Println(err)
@@ -88,19 +89,19 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 
 func registerHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
-		// Получение данных из формы регистрации
+		// Get the registration form data
 		username := r.FormValue("username")
 		password := r.FormValue("password")
 		email := r.FormValue("email")
 		phone := r.FormValue("phone")
 
-		// Проверка, что пользователь с таким именем не существует
+		// Check if the username already exists
 		if userExists(username) {
 			http.Error(w, "Username already exists", http.StatusBadRequest)
 			return
 		}
 
-		// Вставка нового пользователя в базу данных
+		// Insert the new user into the database
 		err := insertUser(username, password, email, phone)
 		if err != nil {
 			log.Println(err)
@@ -108,10 +109,10 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Перенаправление на страницу авторизации
+		// Redirect to the login page
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 	} else {
-		// Загрузка шаблона HTML
+		// Load the HTML template
 		tmpl, err := template.ParseFiles("templates/register.html")
 		if err != nil {
 			log.Println(err)
@@ -119,7 +120,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Отображение страницы регистрации
+		// Render the registration page
 		err = tmpl.Execute(w, nil)
 		if err != nil {
 			log.Println(err)
@@ -130,30 +131,17 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
-		/*
-			tmpl, err := template.ParseFiles("templates/login.html")
-			if err != nil {
-				log.Println(err)
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-				return
-			}
-			err = tmpl.Execute(w, nil)
-			if err != nil {
-				log.Println(err)
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			}
-		*/
-		// Получение данных из формы авторизации
+		// Get the login form data
 		username := r.FormValue("username")
 		password := r.FormValue("password")
 
-		// Проверка соответствия имени пользователя и пароля в базе данных
+		// Check if the username and password match in the database
 		if !authenticateUser(username, password) {
 			http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 			return
 		}
 
-		// Создание новой сессии и установка куки
+		// Create a new session and set the cookie
 		sessionToken := createSession(username)
 		cookie := &http.Cookie{
 			Name:     "session_token",
@@ -162,10 +150,10 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		http.SetCookie(w, cookie)
 
-		// Перенаправление на главную страницу
+		// Redirect to the home page
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	} else {
-		// Загрузка шаблона HTML
+		// Load the HTML template
 		tmpl, err := template.ParseFiles("templates/login.html")
 		if err != nil {
 			log.Println(err)
@@ -173,7 +161,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Отображение страницы авторизации
+		// Render the login page
 		err = tmpl.Execute(w, nil)
 		if err != nil {
 			log.Println(err)
@@ -182,10 +170,10 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Проверка, что пользователь с заданным именем существует
+// Check if a user with the given username exists
 func userExists(username string) bool {
 	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM users WHERE username = ?", username).Scan(&count)
+	err := db.QueryRow("SELECT COUNT(*) FROM users WHERE username = $1", username).Scan(&count)
 	if err != nil {
 		log.Println(err)
 		return false
@@ -193,9 +181,9 @@ func userExists(username string) bool {
 	return count > 0
 }
 
-// Вставка нового пользователя в базу данных
+// Insert a new user into the database
 func insertUser(username, password, email, phone string) error {
-	_, err := db.Exec("INSERT INTO users (username, password, email, phone) VALUES (?, ?, ?, ?)",
+	_, err := db.Exec("INSERT INTO users (username, password, email, phone) VALUES ($1, $2, $3, $4)",
 		username, password, email, phone)
 	if err != nil {
 		log.Println(err)
@@ -204,10 +192,10 @@ func insertUser(username, password, email, phone string) error {
 	return nil
 }
 
-// Проверка соответствия имени пользователя и пароля в базе данных
+// Check if the username and password match in the database
 func authenticateUser(username, password string) bool {
 	var storedPassword string
-	err := db.QueryRow("SELECT password FROM users WHERE username = ?", username).Scan(&storedPassword)
+	err := db.QueryRow("SELECT password FROM users WHERE username = $1", username).Scan(&storedPassword)
 	if err != nil {
 		log.Println(err)
 		return false
@@ -215,35 +203,34 @@ func authenticateUser(username, password string) bool {
 	return password == storedPassword
 }
 
-// Создание новой сессии для пользователя
+// Create a new session for the user
 func createSession(username string) string {
-	// Здесь можно реализовать генерацию случайного токена
-	// и сохранение его в базе данных для связки с пользователем
-	// В данном примере будет использован простой вариант сессии,
-	// где токеном является имя пользователя
+	// Here, you can implement generating a random token
+	// and store it in the database to associate with the user
+	// In this example, a simple session is used where the token is the username
 	return username
 }
 
-// Проверка валидности сессии
+// Check if the session is valid
 func isSessionValid(sessionToken string) bool {
-	// Здесь можно реализовать проверку валидности токена
-	// и его связку с пользователем в базе данных
-	// В данном примере сессия считается валидной, если токен равен имени пользователя
+	// Here, you can implement the validation of the token
+	// and its association with the user in the database
+	// In this example, the session is considered valid if the token is equal to the username
 	return sessionToken == getUsernameFromSession(sessionToken)
 }
 
-// Получение имени пользователя из сессии
+// Get the username from the session token
 func getUsernameFromSession(sessionToken string) string {
-	// Здесь можно реализовать получение имени пользователя
-	// по заданному токену из базы данных
-	// В данном примере сессионный токен считается именем пользователя
+	// Here, you can implement retrieving the username
+	// based on the given token from the database
+	// In this example, the session token is considered as the username
 	return sessionToken
 }
 
-// Получение данных пользователя из базы данных
+// Get the user data from the database
 func getUser(username string) *User {
 	var user User
-	err := db.QueryRow("SELECT * FROM users WHERE username = ?", username).Scan(&user.Username, &user.Password, &user.Email, &user.Phone)
+	err := db.QueryRow("SELECT * FROM users WHERE username = $1", username).Scan(&user.Username, &user.Password, &user.Email, &user.Phone)
 	if err != nil {
 		log.Println(err)
 	}
