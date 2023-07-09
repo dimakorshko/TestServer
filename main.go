@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"os"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -39,12 +40,17 @@ func main() {
 		log.Fatal(err)
 	}
 
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080" // Порт по умолчанию, если переменная окружения PORT не установлена
+	}
+
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/register", registerHandler)
 	http.HandleFunc("/login", loginHandler)
 
-	log.Println("Server started on http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Printf("Server started on http://localhost:%s", port)
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
@@ -120,6 +126,19 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
+		/*
+			tmpl, err := template.ParseFiles("templates/login.html")
+			if err != nil {
+				log.Println(err)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				return
+			}
+			err = tmpl.Execute(w, nil)
+			if err != nil {
+				log.Println(err)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
+		*/
 		// Получение данных из формы авторизации
 		username := r.FormValue("username")
 		password := r.FormValue("password")
@@ -192,6 +211,7 @@ func authenticateUser(username, password string) bool {
 	return password == storedPassword
 }
 
+// Создание новой сессии для пользователя
 func createSession(username string) string {
 	// Здесь можно реализовать генерацию случайного токена
 	// и сохранение его в базе данных для связки с пользователем
