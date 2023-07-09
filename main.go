@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -17,6 +19,14 @@ type User struct {
 }
 
 func main() {
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080" // Порт по умолчанию, если переменная окружения не установлена
+	}
+
+	log.Fatal(http.ListenAndServe(":"+port, nil))
+
 	// Подключение к базе данных SQLite
 	db, err := sql.Open("sqlite3", "test.db")
 	if err != nil {
@@ -37,6 +47,7 @@ func main() {
 	}
 
 	http.HandleFunc("/account", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, path.Join("public", "account.html"))
 		// Получение значения куки с именем пользователя
 		cookie, err := r.Cookie("username")
 		if err != nil || cookie.Value == "" {
@@ -120,8 +131,7 @@ func main() {
 	// Обработчик POST запроса на эндпоинт /user
 	http.HandleFunc("/user", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
-			// Отображение формы для ввода данных пользователя
-			http.ServeFile(w, r, "form.html")
+			http.ServeFile(w, r, path.Join("public", "form.html"))
 			return
 		} else if r.Method == http.MethodPost {
 			// Чтение данных из формы
