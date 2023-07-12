@@ -1,4 +1,4 @@
-web: go run main.go $PORT
+web: go-getting-started
 
 
 
