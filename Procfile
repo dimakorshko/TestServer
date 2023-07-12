@@ -1,4 +1,4 @@
-web: go-getting-started
+web: main
 
 
 
