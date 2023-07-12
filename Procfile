@@ -1,5 +1,1 @@
-web: main
-
-
-
-
+web: ./main
