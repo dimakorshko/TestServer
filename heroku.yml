@@ -4,9 +4,9 @@ build:
 
 run:
   web:
-    image: golang:latest
     command:
       - go
       - run
       - main.go
       - $PORT
+    image: heroku/go
