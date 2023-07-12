@@ -1,8 +1,8 @@
 build:
-  # Используйте образ Heroku с предустановленным Go
   docker:
-    image: Dockerfile
+    web: Dockerfile
 
 run:
-  # Запускайте ваше приложение с помощью команды `go run`
-  web: go run main.go $PORT
+  web:
+    image: golang:latest
+    command: go run main.go $PORT
