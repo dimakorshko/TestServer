@@ -1,3 +1,3 @@
-web: ./main.exe
+web: ./main.go
 
 
