@@ -1,4 +1,5 @@
-web: TestServer
+web: ./main
+
 
 
 
