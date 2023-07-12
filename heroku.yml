@@ -1,7 +1,7 @@
 build:
   # Используйте образ Heroku с предустановленным Go
   docker:
-    image: heroku/go
+    image: Dockerfile
 
 run:
   # Запускайте ваше приложение с помощью команды `go run`
